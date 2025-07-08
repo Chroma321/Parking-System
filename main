@@ -1,0 +1,102 @@
+import cv2
+from matplotlib import pyplot as plt
+import numpy as np
+import imutils
+import easyocr
+from ultralytics import YOLO
+from ultralytics.slow import 
+
+def auto_crop_plate(image):
+    # Konversi ke grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # Terapkan Gaussian blur untuk mengurangi noise
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    
+    # Terapkan adaptive thresholding
+    thresh = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                   cv2.THRESH_BINARY_INV, 11, 3)
+    
+    # Deteksi kontur
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    
+    # Filter kontur berdasarkan ukuran dan rasio aspek (mirip plat nomor)
+    plate_contour = None
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        aspect_ratio = w / float(h)
+        # Filter berdasarkan rasio aspek plat nomor (misalnya, 2:1 hingga 4:1)
+        if w > 100 and h > 20 and 2 <= aspect_ratio <= 4:
+            plate_contour = contour
+            break
+    
+    # Jika kontur plat ditemukan, crop area
+    if plate_contour is not None:
+        x, y, w, h = cv2.boundingRect(plate_contour)
+        cropped = thresh[y:y+h, x:x+w]
+        # Resize untuk mempertahankan detail
+        resized = imutils.resize(cropped, width=600)
+        return resized, (x, y, w, h)
+    else:
+        print("Tidak ada plat nomor yang terdeteksi secara otomatis.")
+        return thresh, (0, 0, 0, 0)  # Kembalikan gambar utuh jika gagal
+
+def main():
+    # Baca gambar dengan jalur file yang benar
+    try:
+        img = cv2.imread('C:/Users/Public/Documents/Codes/Images/B 9958 QMF cropped.png')
+        if img is None:
+            raise FileNotFoundError("Gambar tidak ditemukan. Periksa jalur file!")
+    except Exception as e:
+        print(f"Error: {e}")
+        return
+
+    # Preprocessing dan crop otomatis
+    processed_img, (x, y, w, h) = auto_crop_plate(img)
+
+    # Inisialisasi EasyOCR dengan bahasa tambahan
+    reader = easyocr.Reader(['en', 'id'])  # Tambahkan 'id' untuk plat nomor Indonesia
+
+    # Deteksi teks dalam gambar
+    results = reader.readtext(processed_img)
+
+    # Tampilkan gambar asli dan hasil OCR
+    plt.figure(figsize=(12, 5))
+
+    # Gambar asli
+    plt.subplot(1, 3, 1)
+    plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    plt.title('Gambar Asli')
+    plt.axis('off')
+
+    # Area yang di-crop
+    if w > 0 and h > 0:  # Pastikan koordinat valid
+        plt.subplot(1, 3, 2)
+        plt.imshow(cv2.cvtColor(img[y:y+h, x:x+w], cv2.COLOR_BGR2RGB))
+        plt.title('Area Plat Nomor')
+        plt.axis('off')
+    else:
+        plt.subplot(1, 3, 2)
+        plt.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        plt.title('Gagal Deteksi Area')
+        plt.axis('off')
+
+    # Gambar diproses
+    plt.subplot(1, 3, 3)
+    plt.imshow(processed_img, cmap='gray')
+    plt.title('Gambar Diproses')
+    plt.axis('off')
+
+    # Tampilkan hasil OCR dengan filter probabilitas
+    if results:
+        print("Teks yang terdeteksi:")
+        for (bbox, text, prob) in results:
+            if prob > 0.5:  # Filter teks dengan probabilitas > 0.5
+                print(f"Teks: {text}, Probabilitas: {prob:.2f}")
+    else:
+        print("Tidak ada teks yang terdeteksi dengan probabilitas cukup tinggi.")
+
+    plt.show()
+
+if __name__ == "__main__":
+    main()
