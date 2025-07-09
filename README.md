@@ -9,4 +9,4 @@ The Requirements are:
 - imutils
 - matplotlib
 - cv2
-- 
+- Dataset from https://universe.roboflow.com/iksan-wijaya/plat-detection-2/images/03YnHvZmoy7lOAsXA9uw
