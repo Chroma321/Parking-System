@@ -1,61 +1,97 @@
-from ultralytics import YOLO
 import cv2
-import matplotlib.pyplot as plt
+from ultralytics import YOLO
 import easyocr
+import numpy as np
+import time
+import os
 
-# Muat model
+# Folder penyimpanan gambar
+save_dir = "C:/Users/Public/Documents/Codes/Captured Image"
+os.makedirs(save_dir, exist_ok=True)
+
+# Muat model YOLO
 model = YOLO("C:/Users/Public/Documents/Codes/yolov10/runs/detect/train10/weights/best.pt")
 
-# Lakukan prediksi
-image_path = "C:/Users/Public/Documents/Codes/Images/B 2358 RXP.png"
-results = model.predict(
-    source=image_path,
-    conf=0.25,
-    save=True
-)
+# Inisialisasi EasyOCR
+reader = easyocr.Reader(['en', 'id'])
 
-# Ambil hasil pertama
-result = results[0]
-boxes = result.boxes.xyxy  # Koordinat [x1, y1, x2, y2]
-confidences = result.boxes.conf
-classes = result.boxes.cls
+# Buka kamera
+cap = cv2.VideoCapture(0)
+if not cap.isOpened():
+    print("Error: Kamera tidak dapat dibuka.")
+    exit()
 
-# Proses jika ada deteksi
-if len(boxes) > 0:
-    # Ambil kotak pertama (karena 1 deteksi)
-    x1, y1, x2, y2 = map(int, boxes[0])
-    print(f"Koordinat bounding box: ({x1}, {y1}, {x2}, {y2})")
+# Status deteksi
+detection_active = False
+last_detection_time = time.time()
+detection_cooldown = 5.0  # jeda antar deteksi
 
-    # Muat gambar asli (sama dengan source)
-    image = cv2.imread(image_path)
-    cropped_image = image[y1:y2, x1:x2]
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        print("Error: Gagal membaca frame.")
+        break
 
-    # Konversi dari BGR ke RGB untuk tampilan
-    cropped_image_rgb = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2RGB)
+    current_time = time.time()
+    if not detection_active and (current_time - last_detection_time) > detection_cooldown:
+        results = model.predict(frame, conf=0.25, verbose=False)
+        result = results[0]
+        boxes = result.boxes.xyxy
 
-    # Tampilkan gambar yang dipotong di Jupyter Notebook
-    plt.figure(figsize=(8, 4))
-    plt.imshow(cropped_image_rgb)
-    plt.title("Cropped License Plate Area")
-    plt.axis('off')
-    plt.show()
+        if len(boxes) > 0:
+            detection_active = True
+            last_detection_time = current_time
 
-    # Inisialisasi EasyOCR (tambahkan 'id' untuk bahasa Indonesia)
-    reader = easyocr.Reader(['en', 'id'])
+            x1, y1, x2, y2 = map(int, boxes[0])
+            print(f"Koordinat bounding box: ({x1}, {y1}, {x2}, {y2})")
 
-    # Deteksi teks dari area yang dipotong
-    results = reader.readtext(cropped_image_rgb)
+            cropped_image = frame[y1:y2, x1:x2]
 
-    # Tampilkan teks yang terdeteksi
-    if results:
-        print("Teks yang terdeteksi:")
-        for (bbox, text, prob) in results:
-            print(f"Teks: {text}, Probabilitas: {prob:.2f}")
-    else:
-        print("Tidak ada teks yang terdeteksi.")
+            # Pra-proses OCR
+            gray = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
+            _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            enhanced = cv2.convertScaleAbs(thresh, alpha=1.2, beta=10)
 
-    # Simpan gambar yang dipotong (opsional)
-    cv2.imwrite("cropped_B_9794_CRW.png", cropped_image)
-    print("Cropped image saved as cropped_B_9794_CRW.png")
-else:
-    print("Tidak ada deteksi plat nomor.")
+            # OCR dengan EasyOCR
+            ocr_results = reader.readtext(enhanced)
+            combined_texts = []
+            fallback_text = ""
+            min_conf = 0.3
+
+            if ocr_results:
+                print("Teks yang terdeteksi:")
+                for (bbox, text, prob) in ocr_results:
+                    print(f"Teks: {text}, Probabilitas: {prob:.2f}")
+                    # Bersihkan dan konversi ke huruf besar tanpa spasi
+                    cleaned_text = text.replace(" ", "").strip().upper()
+                    if prob >= min_conf:
+                        combined_texts.append(cleaned_text)
+                    fallback_text = cleaned_text  # simpan sebagai fallback jika tidak lolos threshold
+
+                # Gabungkan teks atau pakai fallback
+                final_text = "".join(combined_texts) if combined_texts else fallback_text
+                print(f"Teks Plat Nomor : {final_text}")
+            else:
+                print("Tidak ada teks yang terdeteksi.")
+
+            # Gambar bounding box
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(frame, "Plate Detected", (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+
+            # Simpan gambar
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            save_path = os.path.join(save_dir, f"detected_plate_{timestamp}.png")
+            cv2.imwrite(save_path, cropped_image)
+            print(f"Gambar disimpan sebagai: {save_path}")
+
+    cv2.imshow("Live Detection", frame)
+
+    if detection_active and (current_time - last_detection_time) > detection_cooldown:
+        detection_active = False
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
