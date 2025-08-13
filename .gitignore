@@ -1,0 +1,40 @@
+# ANPR System Dependencies and Environment
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs and Data
+HasilDeteksi/
+Captured Image/
+*.log
+
+# Model weights (too large for git)
+*.pt
+*.weights
+
+# Database
+*.db
+*.sqlite
+
+# Temporary files
+*.tmp
+*.temp
+
+# Exclude yolov10 submodule
+yolov10/
