@@ -23,18 +23,21 @@ def run_gui():
 
 if __name__ == "__main__":
     print("=== ANPR System Starting ===")
-    print("This will start both detection and GUI")
-    print("Press Ctrl+C to stop everything")
+    print("Starting GUI first, then detection system...")
     
     # Start GUI first in a separate thread
     gui_thread = threading.Thread(target=run_gui, daemon=True)
     gui_thread.start()
     
-    # Give GUI a moment to start
-    time.sleep(3)
+    # Give GUI more time to fully start and display URL
+    print("⏳ Waiting for GUI to start...")
+    time.sleep(8)
+    
+    print("🚀 Now starting detection system...")
+    print("📱 Open your browser to the URL shown above for the dashboard")
     
     try:
-        # Run detection in main thread
+        # Run detection in main thread (so camera window shows)
         run_detection()
     except KeyboardInterrupt:
         print("\n🛑 Shutting down ANPR system...")
