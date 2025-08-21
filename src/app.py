@@ -46,7 +46,7 @@ class ANPRApp:
             
         cursor = conn.cursor()
         try:
-            cursor.execute("INSERT INTO member_list (plate_number, name) VALUES (%s, %s)", (plate_number, name))
+            cursor.execute("INSERT INTO member_list (plate_number, owner_name) VALUES (%s, %s)", (plate_number, name))
             conn.commit()
             ui.notify(f"Member {plate_number} added successfully", type='positive')
             return True
