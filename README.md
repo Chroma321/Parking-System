@@ -14,7 +14,7 @@ This project uses [NiceGUI](https://nicegui.io/) for the web interface.
    ```
 2. Run the app:
    ```bash
-   python src/app.py
+   python src/main.py
    ```
 
 ## About
