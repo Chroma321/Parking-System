@@ -10,7 +10,7 @@ This project uses [NiceGUI](https://nicegui.io/) for the web interface.
 ## Quick Start
 1. Install dependencies:
    ```bash
-   pip install nicegui
+   pip install requirement.txt
    ```
 2. Run the app:
    ```bash
